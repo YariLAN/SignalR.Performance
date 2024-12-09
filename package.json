@@ -1,0 +1,15 @@
+{
+  "dependencies": {
+    "playwright": "^1.49.0"
+  },
+  "name": "websignalrapplication",
+  "version": "1.0.0",
+  "main": "load-test.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}

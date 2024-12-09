@@ -1,0 +1,6 @@
+@WebSIgnalrApplication_HostAddress = http://localhost:5249
+
+GET {{WebSIgnalrApplication_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -1,0 +1,103 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>SignalR Chat</title>
+</head>
+<body>
+    <div id="inputForm">
+        <input type="text" id="message" placeholder="Введите сообщение" />
+        <input type="button" id="sendBtn" value="Отправить" disabled="disabled" />
+        <input type="button" id="startAutoBtn" value="Начать автосообщения" />
+        <input type="button" id="stopAutoBtn" value="Остановить автосообщения" disabled="disabled" />
+    </div>
+    <div id="chatroom"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.js"></script>
+    <script>
+        const hubConnection = new signalR.HubConnectionBuilder()
+            .withUrl("/chat", { transport: signalR.HttpTransportType.WebSockets })
+            .build();
+
+        let autoMessageInterval;
+        const messageTimes = new Map(); // Хранилище времени отправки сообщений
+
+        let globalLatencies = [];
+
+        document.getElementById("sendBtn").addEventListener("click", function() {
+            const message = document.getElementById("message").value;
+            sendMessage(message);
+        });
+
+        document.getElementById("startAutoBtn").addEventListener("click", function() {
+            const message = document.getElementById("message").value || "Автосообщение";
+            startAutoMessages(message);
+        });
+
+        document.getElementById("stopAutoBtn").addEventListener("click", function() {
+            stopAutoMessages();
+        });
+
+        hubConnection.on("Receive", function(message) {
+            const messageElement = document.createElement("p");
+            messageElement.textContent = message;
+            document.getElementById("chatroom").appendChild(messageElement);
+
+            // Записываем время получения и считаем задержку
+            if (messageTimes.has(message)) {
+                const sendTime = messageTimes.get(message);
+                const receiveTime = Date.now();
+                console.log(`Сообщение "${message}" доставлено за ${receiveTime - sendTime} мс`);
+                const latency = receiveTime - sendTime;
+                globalLatencies.push({ time: Date.now(), latency });
+                messageTimes.delete(message); // Удаляем из хранилища
+            }
+        });
+
+        hubConnection.start()
+            .then(function() {
+                document.getElementById("sendBtn").disabled = false;
+            })
+            .catch(function(err) {
+                return console.error(err.toString());
+            });
+
+        function sendMessage(message) {
+            const timestamp = Date.now(); // Время отправки сообщения
+            messageTimes.set(message, timestamp); // Сохраняем время отправки
+            hubConnection.invoke("Send", message)
+                .catch(function(err) {
+                    return console.error(err.toString());
+                });
+        }
+
+        function startAutoMessages(message) {
+            if (!autoMessageInterval) {
+                autoMessageInterval = setInterval(() => {
+                    const autoMessage = `${message} ${Date.now()}`; // Уникальное сообщение с таймстампом
+                    sendMessage(autoMessage);
+                }, 10000); // каждые 10 секунд
+                document.getElementById("startAutoBtn").disabled = true;
+                document.getElementById("stopAutoBtn").disabled = false;
+            }
+        }
+
+        function stopAutoMessages() {
+            if (autoMessageInterval) {
+                clearInterval(autoMessageInterval);
+                autoMessageInterval = null;
+                document.getElementById("startAutoBtn").disabled = false;
+                document.getElementById("stopAutoBtn").disabled = true;
+            }
+        }
+
+        window.addEventListener("beforeunload", () => {
+            if (globalLatencies.length > 0) {
+                hubConnection.invoke("SendLatencies", globalLatencies)
+                    .catch(function(err) {
+                        console.error("Ошибка при отправке данных о задержках:", err.toString());
+                    });
+            }
+        });
+    </script>
+</body>
+</html>
